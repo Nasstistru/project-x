@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expenses API</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f4f6f9;
+      color: #1a1a2e;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+    .page { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 24px; }
+    h1 { font-size: 1.5rem; font-weight: 700; }
+    h1 span { color: #4f6ef7; }
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07);
+    }
+    .card-title {
+      font-size: .75rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 16px;
+    }
+    .method { display: inline-block; font-size: .7rem; font-weight: 700;
+      padding: 2px 7px; border-radius: 4px; margin-right: 6px; }
+    .post { background: #e8f4e8; color: #2d7a2d; }
+    .get  { background: #e8eeff; color: #2d4fd6; }
+    label { display: block; font-size: .85rem; font-weight: 500; margin-bottom: 4px; color: #444; }
+    input[type="number"], input[type="text"], input[type="date"] {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1.5px solid #dde1ea;
+      border-radius: 8px;
+      font-size: .95rem;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input:focus { border-color: #4f6ef7; }
+    .field { margin-bottom: 14px; }
+    button {
+      margin-top: 18px;
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    button:hover { opacity: .85; }
+    .btn-post { background: #4f6ef7; color: #fff; }
+    .btn-get  { background: #1a1a2e; color: #fff; }
+    .result {
+      margin-top: 16px;
+      background: #f8f9fc;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: .82rem;
+      line-height: 1.55;
+      display: none;
+    }
+    .result.visible { display: block; }
+    .result.ok  { border-left: 3px solid #4caf50; }
+    .result.err { border-left: 3px solid #e53935; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; margin-top: 10px;}
+    th { text-align: left; padding: 10px 8px; background: #eef0f8; font-weight: 600; }
+    td { padding: 10px 8px; border-top: 1px solid #eee; }
+    tr:hover td { background: #f9faff; }
+    .ai-box {
+      margin-bottom: 15px;
+      padding: 12px;
+      background: #f0f4ff;
+      border-radius: 10px;
+      border-left: 4px solid #4f6ef7;
+      color: #2c3e50;
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <h1>Expenses <span>API</span></h1>
+
+  <div class="card">
+    <div class="card-title"><span class="method post">POST</span>/expenses — добавить</div>
+    <div class="field">
+      <label for="amount">Сумма (грн)</label>
+      <input type="number" id="amount" min="0.01" step="0.01" placeholder="0.00" />
+    </div>
+    <div class="field">
+      <label for="category">Категория</label>
+      <input type="text" id="category" placeholder="Например: Еда" />
+    </div>
+    <button class="btn-post" onclick="postExpense()">Добавить расход</button>
+    <div class="result" id="post-result"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="method get">GET</span>/expenses/{date} — поиск</div>
+    <div class="field">
+      <label for="date">Дата</label>
+      <input type="date" id="date" />
+    </div>
+    <button class="btn-get" onclick="getExpenses()">Показать расходы и мнение ИИ</button>
+    <div class="result" id="get-result"></div>
+  </div>
+</div>
+
+<script>
+  // Устанавливаем текущую дату при загрузке
+  document.getElementById("date").value = new Date().toISOString().slice(0, 10);
+
+  function show(el, type, html) {
+    el.className = `result visible ${type === "error" ? "err" : "ok"}`;
+    el.innerHTML = html;
+  }
+
+  async function postExpense() {
+    const amountInput = document.getElementById("amount");
+    const categoryInput = document.getElementById("category");
+    const out = document.getElementById("post-result");
+
+    const amount = amountInput.value.trim();
+    const category = categoryInput.value.trim();
+
+    if (!amount || !category) {
+      show(out, "error", "Заполни все поля, прежде чем тратить!");
+      return;
+    }
+
+    const body = new FormData();
+    body.append("amount", amount);
+    body.append("category", category);
+
+    try {
+      const res = await fetch("/expenses", { method: "POST", body });
+      const data = await res.json();
+
+      if (res.ok) {
+        show(out, "ok", `✅ Успешно: <b>${data.amount} грн</b> ушло на <b>${data.category}</b>`);
+        // Очищаем поля после успеха
+        amountInput.value = "";
+        categoryInput.value = "";
+      } else {
+        show(out, "error", `Ошибка: ${data.detail || "Не удалось сохранить"}`);
+      }
+    } catch (e) {
+      show(out, "error", "Сервер спит или не отвечает.");
+    }
+  }
+
+  async function getExpenses() {
+    const date = document.getElementById("date").value;
+    const out = document.getElementById("get-result");
+
+    if (!date) { show(out, "error", "Выбери дату!"); return; }
+
+    try {
+      const res = await fetch(`/expenses/${date}`);
+      const data = await res.json();
+
+      if (res.ok) {
+        let html = `<div class="ai-box"><b>🤖 Мнение Gemini:</b><br>${data.ai_comment}</div>`;
+        html += `<table>
+                    <thead><tr><th>#</th><th>Категория</th><th>Сумма</th></tr></thead>
+                    <tbody>`;
+
+        data.expenses.forEach(r => {
+          html += `<tr><td>${r.id}</td><td>${r.category}</td><td>${r.amount} грн</td></tr>`;
+        });
+
+        html += `</tbody></table>`;
+        show(out, "ok", html);
+      } else {
+        show(out, "error", `❌ ${data.detail || "На эту дату записей нет"}`);
+      }
+    } catch (e) {
+      show(out, "error", "❌ Ошибка связи с сервером.");
+    }
+  }
+</script>
+</body>
+</html>
